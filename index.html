@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Layoff to Arc</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: one narrow column, five numbered steps that all start in a working state. */
+:root {
+  --paper: #F1F2EE;
+  --card: #FAFAF7;
+  --ink: #14151A;
+  --muted: #5C6058;
+  --line: #D3D5CE;
+  --accent: #D93E16;
+  --accent-ink: #FFFFFF;
+  --ok: #1F7A4D;
+  --f-display: "Barlow Condensed", "Arial Narrow", sans-serif;
+  --f-body: "IBM Plex Sans", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #121316; --card: #1A1C21; --ink: #ECEDE8; --muted: #9A9E96;
+    --line: #2E3138; --accent: #FF6A42; --accent-ink: #14151A; --ok: #4FBF86;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #121316; --card: #1A1C21; --ink: #ECEDE8; --muted: #9A9E96;
+  --line: #2E3138; --accent: #FF6A42; --accent-ink: #14151A; --ok: #4FBF86;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--paper); color: var(--ink); font: 400 16px/1.5 var(--f-body); }
+.wrap { max-width: 720px; margin: 0 auto; padding: 20px 16px 48px; display: flex; flex-direction: column; gap: 20px; }
+h1, h2 { font-family: var(--f-display); font-weight: 700; text-wrap: balance; margin: 0; line-height: 1; letter-spacing: 0.005em; }
+h1 { font-size: clamp(40px, 11vw, 60px); }
+h2 { font-size: 28px; }
+p { margin: 0; }
+.eyebrow { font: 500 12px/1.3 var(--f-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.lede { color: var(--muted); max-width: 62ch; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.step-head { display: flex; align-items: baseline; gap: 10px; }
+.num { font: 500 13px var(--f-mono); color: var(--accent); }
+.note { font: 400 13px/1.4 var(--f-mono); color: var(--muted); }
+button { font: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* tracker rows */
+.rows { display: flex; flex-direction: column; }
+.row { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 12px 0; border-top: 1px solid var(--line); align-items: center; }
+.row:first-child { border-top: 0; }
+.row .co { font-weight: 600; }
+.row .meta { color: var(--muted); font-size: 13px; grid-column: 1; }
+.row .n { font: 500 15px var(--f-mono); font-variant-numeric: tabular-nums; text-align: right; }
+.pick { grid-column: 2; grid-row: 2; justify-self: end; border: 1px solid var(--ink); background: transparent; color: var(--ink); border-radius: 6px; padding: 6px 10px; font-size: 13px; font-weight: 500; }
+.pick[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+
+/* chips */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { border: 1px solid var(--line); background: transparent; color: var(--ink); border-radius: 999px; padding: 7px 14px; font-size: 14px; }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.label { font-weight: 600; font-size: 14px; }
+.field { display: flex; flex-direction: column; gap: 8px; }
+
+/* arc */
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+input:disabled { opacity: .5; cursor: not-allowed; }
+code { font: 500 13px var(--f-mono); }
+.tag { font: 500 11px var(--f-mono); color: var(--accent); margin-left: 6px; }
+.stat { border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+.stat b { display: block; font: 700 30px/1 var(--f-display); font-variant-numeric: tabular-nums; }
+.stat span { font: 400 12px var(--f-mono); color: var(--muted); }
+.bar { height: 8px; background: var(--line); border-radius: 99px; overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .25s ease; }
+.quests { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.quest { display: grid; grid-template-columns: 22px 1fr auto; gap: 12px; align-items: start; padding: 12px 0; border-top: 1px solid var(--line); }
+.quest:first-child { border-top: 0; }
+.quest input { width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--accent); }
+.quest label { display: flex; flex-direction: column; gap: 2px; cursor: pointer; }
+.quest .day { font: 500 12px var(--f-mono); color: var(--muted); }
+.quest.done .txt { color: var(--muted); text-decoration: line-through; }
+.xp { font: 500 13px var(--f-mono); color: var(--ok); white-space: nowrap; }
+
+/* roles */
+.role { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 12px 0; border-top: 1px solid var(--line); align-items: center; }
+.role:first-child { border-top: 0; }
+.role .t { font-weight: 600; }
+.role .m { color: var(--muted); font-size: 13px; }
+.ask { grid-row: 1 / span 2; grid-column: 2; border: 1px solid var(--ink); background: var(--ink); color: var(--paper); border-radius: 6px; padding: 8px 12px; font-size: 13px; font-weight: 500; }
+.ask[aria-pressed="true"] { background: transparent; color: var(--ok); border-color: var(--ok); }
+
+/* join */
+input[type="email"] { font: inherit; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); color: var(--ink); width: 100%; }
+.consent { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; }
+.consent input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--accent); }
+.go { border: 0; background: var(--accent); color: var(--accent-ink); border-radius: 6px; padding: 11px 16px; font-weight: 600; align-self: flex-start; }
+.go[disabled] { opacity: .4; cursor: not-allowed; }
+.status { font-size: 14px; color: var(--ok); min-height: 1.4em; }
+
+/* funnel */
+.fun { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.fun li { display: grid; grid-template-columns: 22px 1fr; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+.fun li:first-child { border-top: 0; }
+.fun code { font: 500 13px var(--f-mono); }
+.fun span { color: var(--muted); font-size: 14px; display: block; }
+.ship { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+footer { font: 400 12px/1.5 var(--f-mono); color: var(--muted); display: flex; flex-direction: column; gap: 6px; }
+footer a { color: var(--ink); }
+@media (prefers-reduced-motion: reduce) { .bar > i { transition: none; } }
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<header style="display:flex;flex-direction:column;gap:12px">
+  <div class="eyebrow">Concept for the Product Engineer role · sample data</div>
+  <h1>Laid off? Here's your first week.</h1>
+  <p class="lede">The layoffs tracker meets people on a hard day, then offers a generic "Browse open roles" link. This turns each row into a 7-day plan, roles matched to the person, and warm intros, with the signup asked for last. Everything below is clickable.</p>
+</header>
+
+<section class="card" aria-labelledby="s1">
+  <div class="step-head"><span class="num">01</span><h2 id="s1">Pick the layoff that affected you</h2></div>
+  <div class="rows" id="rows"></div>
+  <p class="note">Sample companies, not real events.</p>
+</section>
+
+<section class="card" aria-labelledby="s2">
+  <div class="step-head"><span class="num">02</span><h2 id="s2">A few quick questions</h2></div>
+  <div class="field"><div class="label" id="craft-l">What do you do?</div><div class="chips" id="crafts" role="group" aria-labelledby="craft-l"></div></div>
+  <div class="field"><div class="label" id="lvl-l">Where are you in your career?</div><div class="chips" id="levels" role="group" aria-labelledby="lvl-l"></div></div>
+  <div class="field"><div class="label" id="loc-l">Where do you want to work?</div><div class="chips" id="locs" role="group" aria-labelledby="loc-l"></div></div>
+  <div class="field"><div class="label" id="urg-l">How urgently are you looking?</div><div class="chips" id="urgs" role="group" aria-labelledby="urg-l"></div></div>
+  <label class="consent"><input id="spons" type="checkbox"> <span>Show roles that support visa sponsorship, where available. Optional, used only to filter roles.</span></label>
+  <p class="note" id="pace"></p>
+</section>
+
+<section class="card" aria-labelledby="s3">
+  <div class="step-head"><span class="num">03</span><h2 id="s3">Your first week</h2></div>
+  <div class="stats" id="stats"></div>
+  <div class="bar" role="progressbar" aria-label="Progress" aria-valuemin="0" aria-valuemax="7" id="bar"><i id="barfill"></i></div>
+  <label class="consent"><input id="xpon" type="checkbox"> <span>Show XP and levels. Optional.</span></label>
+  <p class="note">Skip a day and nothing resets. Do the steps in any order.</p>
+  <ul class="quests" id="quests"></ul>
+</section>
+
+<section class="card" aria-labelledby="s4">
+  <div class="step-head"><span class="num">04</span><h2 id="s4">Roles matched to you</h2></div>
+  <div id="roles"></div>
+  <p class="note">Sample roles. In production these come from the public jobs API, which filters by function, seniority, location and remote.</p>
+</section>
+
+<section class="card" aria-labelledby="s5">
+  <div class="step-head"><span class="num">05</span><h2 id="s5">Join the network</h2></div>
+  <p id="gate" class="note">You've seen your plan and matched roles. Ready to connect with founders? Join the network whenever you're ready.</p>
+  <form id="join" novalidate>
+    <div class="field">
+      <label class="label" for="email">Email</label>
+      <input id="email" type="email" placeholder="name@email.com" autocomplete="email">
+    </div>
+    <label class="consent" style="margin-top:12px"><input id="ok" type="checkbox"> <span>Yes, share my profile with founders who are hiring for roles like these.</span></label>
+    <button class="go" id="submit" type="submit" style="margin-top:12px" disabled>Join the network</button>
+  </form>
+  <div class="status" id="status" role="status"></div>
+</section>
+
+<section class="card" aria-labelledby="s6">
+  <div class="step-head"><span class="num">06</span><h2 id="s6">How I would measure it</h2></div>
+  <p><b>Primary metric:</b> accepted intros per 100 tracker visitors. <b>Downstream:</b> interviews scheduled and hires, reported back by founders. <b>Guardrails:</b> unsubscribes, intro decline rate, candidate and founder satisfaction.</p>
+  <p><b>A/B test:</b> half of tracker visitors see today's row link, half see "I was affected". Same page and traffic. Ship only if accepted intros rise without worse guardrails.</p>
+  <ol class="fun">
+    <li><span class="num">1</span><div><code>tracker_row_viewed</code><span>Baseline. I would pull today's visit to join rate first.</span></div></li>
+    <li><span class="num">2</span><div><code>arc_started</code> → <code>first_step_done</code><span>Day-one drop-off is the number I would watch most closely.</span></div></li>
+    <li><span class="num">3</span><div><code>network_joined</code> → <code>intro_requested</code> → <code>intro_accepted</code><span>Consented signups, then intros founders actually accept.</span></div></li>
+    <li><span class="num">4</span><div><code>interview_scheduled</code> → <code>hired</code><span>Long-term success, from founder feedback.</span></div></li>
+  </ol>
+</section>
+
+<section class="card" aria-labelledby="s7">
+  <div class="step-head"><span class="num">07</span><h2 id="s7">How I would ship it</h2></div>
+  <ol class="ship">
+    <li>An "I was affected" button on each tracker row opens a drawer. No signup to see the plan.</li>
+    <li>Matching calls the public jobs API (or the MCP <code>search_jobs</code> tool) with function, seniority, location and remote. A sponsorship filter only if the data supports it.</li>
+    <li>Anonymous visitors keep progress locally in the browser. It syncs to Postgres after signup, using their existing infrastructure where possible. Events go to GA4 or whatever analytics they already use.</li>
+    <li><code>join_network</code> runs only after an explicit yes, as their docs require.</li>
+    <li>Week one: button, drawer, plan, matching, event logging and the A/B flag. Nothing else.</li>
+  </ol>
+</section>
+
+<footer>
+  <span>Independent concept by Rhea Ranjit Mulki for the speedrun Product Engineer application. Not an official speedrun page. All companies and roles are invented samples. This page collects nothing and sends nothing.</span>
+  <span>The quest and pipeline mechanics come from <a href="https://www.tryarcl.com">Arcl</a>, a job search app I built with Next.js, React, TypeScript, Supabase and Vercel.</span>
+</footer>
+</main>
+
+<script>
+(function () {
+  var EVENTS = [
+    { id: "nw", co: "Northwind Labs", n: 240, date: "Nov 18", ind: "Fintech · Series C" },
+    { id: "fh", co: "Fernhill Health", n: 85, date: "Nov 14", ind: "Healthcare · Series B" },
+    { id: "qz", co: "Quartzline", n: 410, date: "Nov 11", ind: "AI infrastructure · Series D" },
+    { id: "bl", co: "Brightloom", n: 60, date: "Nov 6", ind: "Consumer · Series A" },
+    { id: "tp", co: "Tidepool Robotics", n: 130, date: "Nov 3", ind: "Hardware · Series B" }
+  ];
+  var CRAFTS = ["Engineering", "Product", "Design", "Data", "Operations"];
+  var LEVELS = ["Early career", "Mid", "Senior"];
+  var LOCS = ["Anywhere", "Remote only", "San Francisco", "New York", "Los Angeles"];
+  var URGS = [
+    { k: "asap", label: "As soon as possible", pace: "Fast pace: shortlist and intros come first, so you can reach founders on day 1 and 2, and roles show newest first. You are not asked for more intros, just earlier ones." },
+    { k: "soon", label: "Within 1–2 months", pace: "Steady pace: profile first, introductions on day 3." },
+    { k: "easy", label: "Exploring at my own pace", pace: "Easy pace: the same 7 steps with no deadlines. Do them in any order." }
+  ];
+  // [title, company, location, level, sponsors, posted label, posted rank, pay]
+  var ROLES = {
+    Engineering: [
+      ["Founding Engineer", "Lumen Grid", "San Francisco", "Mid", 1, "today", 0, "$180k–$230k"],
+      ["Backend Engineer", "Parcelo", "Remote", "Mid", 0, "2 days ago", 2, "$160k–$200k"],
+      ["Product Engineer", "Stackwell", "New York", "Early career", -1, "4 days ago", 4, "$130k–$170k"],
+      ["Staff Engineer", "Orbit Care", "Remote", "Senior", 0, "1 week ago", 7, "$210k–$260k"],
+      ["Software Engineer", "Fieldnote", "Los Angeles", "Early career", 1, "3 days ago", 3, "$125k–$160k"]
+    ],
+    Product: [
+      ["Founding PM", "Mosaic AI", "Los Angeles", "Mid", 1, "today", 0, "$170k–$210k"],
+      ["Senior Product Manager", "Ledgerly", "Remote", "Senior", 0, "2 days ago", 2, "$175k–$215k"],
+      ["Associate PM", "Orbit Care", "San Francisco", "Early career", -1, "5 days ago", 5, "$120k–$150k"],
+      ["Product Manager", "Haven Pay", "New York", "Mid", 0, "1 week ago", 7, "$150k–$185k"],
+      ["Head of Product", "Tallow", "Remote", "Senior", 1, "3 days ago", 3, "$200k–$250k"]
+    ],
+    Design: [
+      ["Founding Designer", "Fieldnote", "San Francisco", "Mid", 1, "today", 0, "$150k–$190k"],
+      ["Product Designer", "Haven Pay", "Remote", "Mid", 0, "2 days ago", 2, "$140k–$175k"],
+      ["Design Engineer", "Tallow", "New York", "Early career", 1, "4 days ago", 4, "$130k–$165k"],
+      ["Senior Brand Designer", "Mosaic AI", "Los Angeles", "Senior", 0, "1 week ago", 7, "$165k–$205k"],
+      ["Junior Product Designer", "Parcelo", "Remote", "Early career", 1, "3 days ago", 3, "$100k–$130k"]
+    ],
+    Data: [
+      ["Analytics Engineer", "Pinecrest", "Remote", "Mid", 1, "today", 0, "$140k–$180k"],
+      ["Data Scientist", "Haven Pay", "New York", "Mid", 0, "2 days ago", 2, "$150k–$195k"],
+      ["Founding Data Lead", "Cobalt Bio", "San Francisco", "Senior", 1, "4 days ago", 4, "$190k–$240k"],
+      ["Data Analyst", "Lumen Grid", "Los Angeles", "Early career", -1, "3 days ago", 3, "$105k–$135k"],
+      ["Senior ML Engineer", "Quill Labs", "Remote", "Senior", 0, "1 week ago", 7, "$200k–$250k"]
+    ],
+    Operations: [
+      ["Chief of Staff", "Mosaic AI", "San Francisco", "Mid", 1, "today", 0, "$140k–$180k"],
+      ["Operations Lead", "Parcelo", "Remote", "Mid", 0, "2 days ago", 2, "$110k–$145k"],
+      ["Business Operations Analyst", "Stackwell", "New York", "Early career", 1, "4 days ago", 4, "$95k–$125k"],
+      ["Head of Operations", "Cobalt Bio", "Los Angeles", "Senior", 0, "1 week ago", 7, "$170k–$210k"],
+      ["Recruiting Coordinator", "Lumen Grid", "Remote", "Early career", -1, "3 days ago", 3, "$75k–$95k"]
+    ]
+  };
+  var Q = {
+    profile: { t: "Update your profile with your last role and one thing you shipped", xp: 20 },
+    pick: { t: "Shortlist 3 roles from your matches", xp: 20 },
+    intros: { t: "Request introductions to relevant founders", xp: 30 },
+    resume: { t: "Tailor your resume to one shortlisted role", xp: 20 },
+    follow: { t: "Follow up where appropriate", xp: 15 },
+    story: { t: "Practice one interview story out loud", xp: 15 },
+    review: { t: "Reflect on your progress and plan your next week", xp: 20 }
+  };
+  var ORDER = {
+    asap: ["pick", "intros", "profile", "resume", "follow", "story", "review"],
+    soon: ["profile", "pick", "intros", "resume", "follow", "story", "review"],
+    easy: ["profile", "pick", "intros", "resume", "follow", "story", "review"]
+  };
+
+  var state = { ev: "nw", craft: "Engineering", level: "Early career", loc: "Anywhere", urg: "soon", spons: false, xp: false, done: {}, asked: {} };
+  var $ = function (id) { return document.getElementById(id); };
+
+  function urg() { return URGS.filter(function (u) { return u.k === state.urg; })[0]; }
+  function matches() {
+    var list = ROLES[state.craft].filter(function (r) {
+      if (r[3] !== state.level) return false;
+      if (state.loc === "Remote only" && r[2] !== "Remote") return false;
+      if (state.loc !== "Anywhere" && state.loc !== "Remote only" && r[2] !== state.loc && r[2] !== "Remote") return false;
+      if (state.spons && r[4] === 0) return false;
+      return true;
+    });
+    if (state.urg === "asap") list = list.slice().sort(function (a, b) { return a[6] - b[6]; });
+    return list;
+  }
+  function doneCount() { return Object.keys(state.done).length; }
+  function xpTotal() { return Object.keys(state.done).reduce(function (n, k) { return n + Q[k].xp; }, 0); }
+  function roleKey(r) { return r[0] + "|" + r[1]; }
+
+  function chips(id, items, current, attr, labelOf) {
+    $(id).innerHTML = items.map(function (it) {
+      var v = typeof it === "string" ? it : it.k;
+      return '<button class="chip" ' + attr + '="' + v + '" aria-pressed="' + (current === v) + '">' + labelOf(it) + '</button>';
+    }).join("");
+  }
+  function renderRows() {
+    $("rows").innerHTML = EVENTS.map(function (e) {
+      return '<div class="row"><div class="co">' + e.co + '</div><div class="n">' + e.n + ' laid off</div>' +
+        '<div class="meta">' + e.date + ' · ' + e.ind + '</div>' +
+        '<button class="pick" data-ev="' + e.id + '" aria-pressed="' + (state.ev === e.id) + '">' +
+        (state.ev === e.id ? "Selected" : "I was affected") + '</button></div>';
+    }).join("");
+  }
+  function renderChips() {
+    chips("crafts", CRAFTS, state.craft, "data-craft", String);
+    chips("levels", LEVELS, state.level, "data-level", String);
+    chips("locs", LOCS, state.loc, "data-loc", String);
+    chips("urgs", URGS, state.urg, "data-urg", function (u) { return u.label; });
+    $("pace").textContent = urg().pace;
+  }
+  function renderArc() {
+    var n = doneCount(), pct = Math.round(n / 7 * 100), xp = xpTotal();
+    var pace = state.urg === "asap" ? "Fast" : state.urg === "soon" ? "Steady" : "Easy";
+    var tiles = state.xp
+      ? [[xp, "XP of 140"], [Math.floor(xp / 40) + 1, "level"], [n + " / 7", "steps done"]]
+      : [[n + " / 7", "steps done"], [pct + "%", "progress"], [pace, "your pace"]];
+    $("stats").innerHTML = tiles.map(function (t) { return '<div class="stat"><b>' + t[0] + '</b><span>' + t[1] + '</span></div>'; }).join("");
+    $("barfill").style.width = pct + "%";
+    $("bar").setAttribute("aria-valuenow", n);
+    $("quests").innerHTML = ORDER[state.urg].map(function (id, i) {
+      var q = Q[id], d = !!state.done[id];
+      return '<li class="quest' + (d ? " done" : "") + '"><input type="checkbox" id="q-' + id + '" data-q="' + id + '"' + (d ? " checked" : "") + '>' +
+        '<label for="q-' + id + '"><span class="day">Day ' + (i + 1) + '</span><span class="txt">' + q.t + '</span></label>' +
+        '<span class="xp">' + (state.xp ? "+" + q.xp + " XP" : "") + '</span></li>';
+    }).join("");
+    $("submit").disabled = !$("ok").checked;
+  }
+  function renderRoles() {
+    var ev = EVENTS.filter(function (e) { return e.id === state.ev; })[0];
+    var list = matches();
+    if (!list.length) { $("roles").innerHTML = '<p class="note">No sample roles match these filters. Loosen one and they come back.</p>'; return; }
+    $("roles").innerHTML = (state.urg === "asap" ? '<p class="note" style="margin-bottom:6px">Newest first, because you are looking now.</p>' : '') +
+      list.map(function (r, i) {
+        var k = roleKey(r), on = !!state.asked[k];
+        return '<div class="role"><div class="t">' + r[0] + ' · ' + r[1] + (r[6] <= 2 ? '<span class="tag">NEW</span>' : '') + '</div>' +
+          '<div class="m">' + r[2] + ' · ' + r[3] + ' · ' + r[7] + ' · posted ' + r[5] + (state.spons ? (r[4] === 1 ? ' · sponsors visas' : ' · sponsorship not listed') : '') + (i === 0 ? ' · same industry as ' + ev.co : '') + '</div>' +
+          '<button class="ask" data-key="' + k + '" aria-pressed="' + on + '">' + (on ? "Requested" : "Ask for intro") + '</button></div>';
+      }).join("");
+  }
+  function renderAll() { renderRows(); renderChips(); renderArc(); renderRoles(); }
+
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("button");
+    if (!t) return;
+    if (t.dataset.ev) { state.ev = t.dataset.ev; renderRows(); renderRoles(); }
+    else if (t.dataset.craft) { state.craft = t.dataset.craft; state.asked = {}; renderChips(); renderRoles(); }
+    else if (t.dataset.level) { state.level = t.dataset.level; state.asked = {}; renderChips(); renderRoles(); }
+    else if (t.dataset.loc) { state.loc = t.dataset.loc; state.asked = {}; renderChips(); renderRoles(); }
+    else if (t.dataset.urg) { state.urg = t.dataset.urg; renderChips(); renderArc(); renderRoles(); }
+    else if (t.dataset.key) {
+      if (state.asked[t.dataset.key]) delete state.asked[t.dataset.key]; else state.asked[t.dataset.key] = true;
+      var want = Math.min(3, matches().length);
+      if (want && Object.keys(state.asked).length >= want) state.done.intros = true;
+      renderRoles(); renderArc();
+    }
+  });
+  document.addEventListener("change", function (e) {
+    var el = e.target;
+    if (el.dataset && el.dataset.q) { if (el.checked) state.done[el.dataset.q] = true; else delete state.done[el.dataset.q]; renderArc(); }
+    else if (el.id === "xpon") { state.xp = el.checked; renderArc(); }
+    else if (el.id === "spons") { state.spons = el.checked; state.asked = {}; renderRoles(); }
+    else if (el.id === "ok") { $("submit").disabled = !el.checked; }
+  });
+  $("join").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var v = $("email").value.trim();
+    if (!/^\S+@\S+\.\S+$/.test(v)) { $("status").style.color = "var(--accent)"; $("status").textContent = "Enter a valid email so a founder can reach you."; return; }
+    $("status").style.color = "var(--ok)";
+    $("status").textContent = "Demo only. Nothing was saved or sent. In production this calls join_network after your explicit yes.";
+    $("email").value = "";
+  });
+
+  renderAll();
+})();
+</script>
+</body>
+</html>
